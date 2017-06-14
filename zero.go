@@ -24,6 +24,7 @@ var Schema = `
 		first_name: String!
 		last_name: String!
 		username: String!
+		fullname: String
 		email: String!
 		friends: [Person]
 	}
@@ -33,6 +34,7 @@ type person struct {
 	ID        graphql.ID
 	FirstName string
 	LastName  string
+	FullName  string
 	Username  string
 	Email     string
 	Friends   *[]person
@@ -73,6 +75,14 @@ func (r *personResolver) FirstName() string {
 
 func (r *personResolver) LastName() string {
 	return r.p.LastName
+}
+
+func (r *personResolver) FullName() *string {
+	if r.p.FirstName == "" || r.p.LastName == "" {
+		return nil
+	}
+	fullName := r.p.FirstName + " " + r.p.LastName
+	return &fullName
 }
 
 func (r *personResolver) Username() string {

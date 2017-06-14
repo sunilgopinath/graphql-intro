@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"bitbucket.org/ffxblue/starwars"
+	"bitbucket.org/ffxblue/go-meeetup"
 	"github.com/neelance/graphql-go"
 	"github.com/neelance/graphql-go/relay"
 )
