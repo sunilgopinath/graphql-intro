@@ -1,9 +1,14 @@
-// Package starwars provides a example schema and resolver based on Star Wars characters.
+// Package zero provides a example schema for a demo
 //
 // Source: https://github.com/graphql/graphql.github.io/blob/source/site/_core/swapiSchema.js
-package starwars
+package zero
 
-import graphql "github.com/neelance/graphql-go"
+import (
+	"database/sql"
+	"fmt"
+
+	graphql "github.com/neelance/graphql-go"
+)
 
 //Schema is the graphql schema
 var Schema = `
@@ -30,81 +35,32 @@ type person struct {
 	LastName  string
 	Username  string
 	Email     string
-	Friends   []graphql.ID
-}
-
-var persons = []*person{
-	{
-		ID:        "1000",
-		FirstName: "Luke",
-		LastName:  "Skywalker",
-		Username:  "lskywalker",
-		Email:     "lskywalker@facebook.com",
-		Friends:   []graphql.ID{"1002", "1003", "2000", "2001"},
-	},
-	{
-		ID:        "1001",
-		FirstName: "Darth",
-		LastName:  "Vader",
-		Username:  "dvader",
-		Email:     "dvader@facebook.com",
-		Friends:   []graphql.ID{"1004"},
-	},
-	{
-		ID:        "1002",
-		FirstName: "Han",
-		LastName:  "Solo",
-		Username:  "hsolo",
-		Email:     "hsolo@facebook.com",
-		Friends:   []graphql.ID{"1000", "1003", "2001"},
-	},
-	{
-		ID:        "1002",
-		FirstName: "Han",
-		LastName:  "Solo",
-		Username:  "hsolo",
-		Email:     "hsolo@facebook.com",
-		Friends:   []graphql.ID{"1000", "1003"},
-	},
-	{
-		ID:        "1003",
-		FirstName: "Leia",
-		LastName:  "Organa",
-		Username:  "lorgana",
-		Email:     "lorgana@facebook.com",
-		Friends:   []graphql.ID{"1000", "1002"},
-	},
-	{
-		ID:        "1004",
-		FirstName: "Wilhuff",
-		LastName:  "Tarkin",
-		Username:  "wtarkin",
-		Email:     "wtarkin@facebook.com",
-		Friends:   []graphql.ID{"1001"},
-	},
+	Friends   *[]person
 }
 
 var personData = make(map[graphql.ID]*person)
 
-func init() {
-	for _, p := range persons {
-		personData[p.ID] = p
-	}
-}
-
 //Resolver maps the schema to go
-type Resolver struct{}
+type Resolver struct {
+	DB *sql.DB
+}
 
 //Person represents the Person type
 func (r *Resolver) Person(args struct{ ID graphql.ID }) *personResolver {
-	if p := personData[args.ID]; p != nil {
-		return &personResolver{p}
-	}
-	return nil
+
+	var p person
+	err := r.DB.QueryRow(`
+		SELECT to_char(uid, '999'), first_name, last_name,
+			username, email FROM userinfo where username=$1`,
+		args.ID).Scan(&p.ID, &p.FirstName, &p.LastName, &p.Username, &p.Email)
+	CheckErr(err)
+	return &personResolver{&p, r.DB}
+
 }
 
 type personResolver struct {
-	p *person
+	p  *person
+	db *sql.DB
 }
 
 func (r *personResolver) ID() graphql.ID {
@@ -128,22 +84,24 @@ func (r *personResolver) Email() string {
 }
 
 func (r *personResolver) Friends() *[]*personResolver {
-	return resolvePersons(r.p.Friends)
+	return resolvePersons(r.db, r.p.Friends)
 }
 
-func resolvePersons(ids []graphql.ID) *[]*personResolver {
+func resolvePersons(db *sql.DB, friends *[]person) *[]*personResolver {
 	var persons []*personResolver
-	for _, id := range ids {
-		if c := resolvePerson(id); c != nil {
-			persons = append(persons, c)
+	rows, err := db.Query(
+		`SELECT to_char(uid, '999'), first_name, last_name,
+		username, email FROM userinfo`)
+	if err != nil {
+		fmt.Println(err)
+	}
+	for rows.Next() {
+		var p person
+		err = rows.Scan(&p.ID, &p.FirstName, &p.LastName, &p.Username, &p.Email)
+		if err != nil {
+			fmt.Println(err)
 		}
+		persons = append(persons, &personResolver{&p, db})
 	}
 	return &persons
-}
-
-func resolvePerson(id graphql.ID) *personResolver {
-	if p, ok := personData[id]; ok {
-		return &personResolver{p}
-	}
-	return nil
 }

@@ -1,26 +1,49 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 
 	"bitbucket.org/ffxblue/starwars"
-
 	"github.com/neelance/graphql-go"
 	"github.com/neelance/graphql-go/relay"
 )
 
 var schema *graphql.Schema
 
-func init() {
-	var err error
-	schema, err = graphql.ParseSchema(starwars.Schema, &starwars.Resolver{})
+const (
+	dbUser     = "postgres"
+	dbPassword = "postgres"
+	dbHost     = "localhost"
+	dbPort     = "5432"
+	dbName     = "test"
+)
+
+func init() {}
+
+func main() {
+
+	dbinfo := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable",
+		dbUser, dbPassword, dbHost, dbPort, dbName)
+	db, err := sql.Open("postgres", dbinfo)
+	zero.CheckErr(err)
+
+	fmt.Println("# Creating table")
+	err = zero.StartDB(db)
+	zero.CheckErr(err)
+
+	fmt.Println("# Inserting values")
+	err = zero.LoadData(db)
+	zero.CheckErr(err)
+
+	schema, err = graphql.ParseSchema(zero.Schema, &zero.Resolver{DB: db})
 	if err != nil {
 		panic(err)
 	}
-}
+	defer db.Close()
 
-func main() {
 	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write(page)
 	}))
